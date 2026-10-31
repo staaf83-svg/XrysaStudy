@@ -1,0 +1,7 @@
+# Αρχεία που ΔΕΝ ανεβαίνουν στο GitHub
+__pycache__/
+build/
+dist/
+Output/
+*.spec
+build.log

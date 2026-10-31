@@ -1,0 +1,10 @@
+anthropic
+google-genai
+openai
+reportlab
+openpyxl
+xlrd
+python-docx
+python-pptx
+pyodbc
+pypdf
