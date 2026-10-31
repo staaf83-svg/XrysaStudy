@@ -16,7 +16,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from tkinter import filedialog, messagebox
 
-VERSION = "0.18"
+VERSION = "0.19"
 # Το δημόσιο αποθετήριο στο GitHub: από εκεί ελέγχονται και κατεβαίνουν οι νέες εκδόσεις
 GITHUB_REPO = "staaf83-svg/XrysaStudy"
 # Ο φάκελος του προγράμματος (στο .exe το PyInstaller βάζει τα αρχεία στο sys._MEIPASS)
@@ -1207,6 +1207,23 @@ class App(tk.Tk):
         self.clock = tk.Label(top, bg=BG, fg=TEXT, font=BOLD)
         self.clock.pack(side="right")
 
+        # Κόστος (με «Μηδενισμό») και Κατάσταση: μικρές γραμμές στην πάνω μπάρα, για να μένει χώρος στο Αποτέλεσμα
+        cost = tk.Frame(top, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
+        cost.pack(side="right", padx=(8, 12))
+        tk.Label(cost, image=self.icon("💰", 16) or "", bg=PANEL).pack(side="left", padx=(4, 0))
+        self.cost_label = tk.Label(cost, bg=PANEL, fg=TEXT, font=("Segoe UI", 8), padx=4, pady=3)
+        self.cost_label.pack(side="left")
+        reset = self._button(cost, "Μηδενισμός", self.reset_cost, icon="🔄")
+        reset.config(font=("Segoe UI", 8, "bold"))
+        reset.pack(side="left")
+        add_cost(self.cfg["costs"], 0.0, datetime.date.today())  # μηδενίζει αν άλλαξε μέρα/μήνας από την τελευταία φορά
+        self.show_cost()
+
+        self.status = tk.Label(top, text="Διάλεξε «Βοήθημα», «Άσκηση» ή «Εργασία».", bg=PANEL, fg=MUTED, font=FONT,
+                               anchor="w", padx=6, pady=4, image=self.icon("ℹ️", 16) or "", compound="left",
+                               highlightthickness=1, highlightbackground=BORDER)
+        self.status.pack(side="left", fill="x", expand=True, padx=(8, 0))
+
     def _side_button(self, parent, text, cmd, icon, label=None):
         """Μεγάλο κουμπί της αριστερής στήλης: εικονίδιο αριστερά και η λέξη δίπλα του, στο ίδιο κουτί."""
         img = self.icon(icon, 46 if label else 34, label)
@@ -1304,25 +1321,10 @@ class App(tk.Tk):
         self.boxes[key].pack(fill="both", expand=True, padx=6, pady=2)
 
     def _build_right(self, body):
-        # Δεξιά: πάνω «Κόστος» και «Κατάσταση», κάτω το «Αποτέλεσμα», με διαχωριστικό που σέρνεται πάνω-κάτω
+        # Δεξιά: το «Αποτέλεσμα» (μέσα σε PanedWindow, ώστε να βγαίνει και να ξαναμπαίνει με «Παράθυρο»)
         right = self.right = tk.PanedWindow(body, orient="vertical", bg="#d9d9d9", sashwidth=6, bd=0,
                                             sashcursor="sb_v_double_arrow")
         body.add(right, minsize=self.winfo_pixels("8c"), stretch="always")
-        top = tk.Frame(right, bg=BG)
-        right.add(top, stretch="never")
-
-        cost_box = self._labelframe(top, "Κόστος και (tokens) — το Gemini μετράει 0$, δωρεάν όριο", "💰")
-        cost_box.pack(fill="x", pady=(0, 6))
-        self.cost_label = tk.Label(cost_box, bg=PANEL, fg=TEXT, font=BOLD, anchor="w", padx=6, pady=6)
-        self.cost_label.pack(fill="x", padx=4, pady=4)
-        add_cost(self.cfg["costs"], 0.0, datetime.date.today())  # μηδενίζει αν άλλαξε μέρα/μήνας από την τελευταία φορά
-        self.show_cost()
-
-        status_box = self._labelframe(top, "Κατάσταση", "ℹ️")
-        status_box.pack(fill="x", pady=(0, 6))
-        self.status = tk.Label(status_box, text="Διάλεξε «Βοήθημα», «Άσκηση» ή «Εργασία».", bg=PANEL, fg=MUTED,
-                               font=FONT, anchor="w", padx=6, pady=8)
-        self.status.pack(fill="x", padx=4, pady=4)
 
         view = self._labelframe(right, "Αποτέλεσμα", "📄", detach="result")
         right.add(self.detachables["result"], stretch="always", minsize=self.winfo_pixels("5c"))
@@ -1406,9 +1408,9 @@ class App(tk.Tk):
 
     # ---------- γενικά ----------
     def _tick(self):
-        days = ["Δευτέρα", "Τρίτη", "Τετάρτη", "Πέμπτη", "Παρασκευή", "Σάββατο", "Κυριακή"]
+        days = ["Δευ", "Τρί", "Τετ", "Πέμ", "Παρ", "Σάβ", "Κυρ"]  # σύντομα, για να χωρά η Κατάσταση στην πάνω μπάρα
         now = datetime.datetime.now()
-        self.clock.config(text=f"{days[now.weekday()]} {now:%d/%m/%Y}    {now:%H:%M:%S}")
+        self.clock.config(text=f"{days[now.weekday()]} {now:%d/%m/%Y}  {now:%H:%M}")
         self.after(1000, self._tick)
 
     def set_status(self, msg, color=MUTED):
@@ -1419,7 +1421,17 @@ class App(tk.Tk):
         parts = [(label, c.get(money_key, 0.0), c.get(tokens_key, 0)) for label, money_key, tokens_key in
                  (("Τελευταίο", "last", "last_tokens"), ("Σήμερα", "today", "today_tokens"),
                   ("Μήνας", "month_total", "month_tokens"))]
-        self.cost_label.config(text="   ·   ".join(f"{label}: {money(m)} ({count_fmt(t)})" for label, m, t in parts))
+        self.cost_label.config(text=" · ".join(f"{label} {money(m)} ({count_fmt(t)})" for label, m, t in parts))
+
+    def reset_cost(self):
+        """«Μηδενισμός»: τελευταίο, σήμερα και μήνας ξεκινούν από το 0 (ρωτά πρώτα)."""
+        if not messagebox.askyesno("Μηδενισμός κόστους", "Να μηδενιστούν το κόστος και τα tokens "
+                                                         "(τελευταίο, σήμερα και μήνας);"):
+            return
+        self.cfg["costs"] = add_cost({}, 0.0, datetime.date.today())
+        save_config(self.cfg)
+        self.show_cost()
+        self.set_status("Το κόστος μηδενίστηκε.", "green")
 
     def zoom(self, step):
         self.size = max(8, min(24, self.size + step))
@@ -2690,6 +2702,18 @@ def selftest():
     zoom, screen = app.suggest_zoom()
     assert 0.7 <= zoom <= 1.3 and screen.startswith("Οθόνη ")
     assert app.icon("💬", 46, "Chat") is not None
+
+    # Μηδενισμός κόστους (χωρίς να πειραχτούν οι πραγματικές ρυθμίσεις)
+    global save_config
+    real_save, real_ask = save_config, messagebox.askyesno
+    save_config, messagebox.askyesno = (lambda cfg: None), (lambda *a, **k: True)
+    try:
+        app.cfg["costs"] = add_cost({}, 0.5, datetime.date.today(), 1000)
+        app.reset_cost()
+        assert (app.cfg["costs"]["today"], app.cfg["costs"]["month_tokens"], app.cfg["costs"]["last"]) == (0.0, 0, 0.0)
+        assert app.cost_label["text"].startswith("Τελευταίο 0,000$ (0)")
+    finally:
+        save_config, messagebox.askyesno = real_save, real_ask
 
     # Εικονίδια, έκδοση και ιστορικό αλλαγών
     assert app.icon("📘", 16) is not None, "δεν βγήκαν τα χρωματιστά εικονίδια"
